@@ -1,0 +1,21 @@
+
+Main.elm,575
+main =main7,136
+type CoordinateID =type15,296
+type CoordinateIDCoordinateID15,296
+    | Y1Y117,323
+    | X2X218,332
+    | Y2Y219,341
+type alias Frame =type21,351
+type alias FrameFrame21,351
+type alias Model =type28,437
+type alias ModelModel28,437
+init firstPiece =init35,544
+type Msg =type38,612
+type MsgMsg38,612
+    | SubmitSolutionSubmitSolution40,665
+    | SubmissionStatusSubmissionStatus41,686
+update msg model =update44,779
+submitSolution model =submitSolution62,1407
+view model =view65,1475
+subscriptions _ =subscriptions77,2052
