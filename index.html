@@ -9001,7 +9001,7 @@ var _elm_lang$http$Http$stringPart = _elm_lang$http$Http$StringPart;
 var _bra1ndump$puzzledlife_frontend$Main$subscriptions = function (_p0) {
 	return _elm_lang$core$Platform_Sub$none;
 };
-var _bra1ndump$puzzledlife_frontend$Main$baseUrl = 'http://localhost:8080/puzzles/braindump/';
+var _bra1ndump$puzzledlife_frontend$Main$baseUrl = 'http://localhost:8000';
 var _bra1ndump$puzzledlife_frontend$Main$Frame = F4(
 	function (a, b, c, d) {
 		return {x1: a, y1: b, x2: c, y2: d};
@@ -9015,7 +9015,7 @@ var _bra1ndump$puzzledlife_frontend$Main$init = function (firstPiece) {
 		ctor: '_Tuple2',
 		_0: A2(
 			_bra1ndump$puzzledlife_frontend$Main$Model,
-			A2(_elm_lang$core$Basics_ops['++'], firstPiece, '.jpg'),
+			firstPiece,
 			A4(_bra1ndump$puzzledlife_frontend$Main$Frame, '', '', '', '')),
 		_1: _elm_lang$core$Platform_Cmd$none
 	};
@@ -9034,13 +9034,13 @@ var _bra1ndump$puzzledlife_frontend$Main$submitSolution = function (model) {
 		_bra1ndump$puzzledlife_frontend$Main$baseUrl,
 		A2(
 			_elm_lang$core$Basics_ops['++'],
-			model.pieceID,
+			'/link/braindump/',
 			A2(
 				_elm_lang$core$Basics_ops['++'],
-				'/passage?',
+				model.pieceID,
 				A2(
 					_elm_lang$core$Basics_ops['++'],
-					'x1=',
+					'?x1=',
 					A2(
 						_elm_lang$core$Basics_ops['++'],
 						solution.x1,
@@ -9113,7 +9113,10 @@ var _bra1ndump$puzzledlife_frontend$Main$update = F2(
 						_1: _elm_lang$core$Platform_Cmd$none
 					};
 				} else {
-					return {ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none};
+					return A2(
+						_elm_lang$core$Debug$log,
+						_elm_lang$core$Basics$toString(_p1._0),
+						{ctor: '_Tuple2', _0: model, _1: _elm_lang$core$Platform_Cmd$none});
 				}
 		}
 	});
@@ -9143,7 +9146,13 @@ var _bra1ndump$puzzledlife_frontend$Main$view = function (model) {
 					{
 						ctor: '::',
 						_0: _elm_lang$html$Html_Attributes$src(
-							A2(_elm_lang$core$Basics_ops['++'], _bra1ndump$puzzledlife_frontend$Main$baseUrl, model.pieceID)),
+							A2(
+								_elm_lang$core$Basics_ops['++'],
+								_bra1ndump$puzzledlife_frontend$Main$baseUrl,
+								A2(
+									_elm_lang$core$Basics_ops['++'],
+									'/puzzles/braindump/',
+									A2(_elm_lang$core$Basics_ops['++'], model.pieceID, '.jpg')))),
 						_1: {ctor: '[]'}
 					},
 					{ctor: '[]'}),
@@ -9248,7 +9257,7 @@ var _bra1ndump$puzzledlife_frontend$Main$view = function (model) {
 };
 var _bra1ndump$puzzledlife_frontend$Main$main = _elm_lang$html$Html$program(
 	{
-		init: _bra1ndump$puzzledlife_frontend$Main$init('100'),
+		init: _bra1ndump$puzzledlife_frontend$Main$init('5530'),
 		view: _bra1ndump$puzzledlife_frontend$Main$view,
 		update: _bra1ndump$puzzledlife_frontend$Main$update,
 		subscriptions: _bra1ndump$puzzledlife_frontend$Main$subscriptions
