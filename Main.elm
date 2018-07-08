@@ -3,6 +3,7 @@ import Html.Attributes exposing(..)
 import Html.Events exposing (..)
 import Http
 import Debug
+import Markdown
 
 baseUrl : String
 baseUrl = "http://localhost:8000"
@@ -10,7 +11,7 @@ baseUrl = "http://localhost:8000"
 main : Program Never Model Msg
 main =
     Html.program
-        { init = init "5530" -- default hash
+        { init = init "4760" -- default hash
         , view = view
         , update = update
         , subscriptions = subscriptions
@@ -31,18 +32,22 @@ type alias Frame =
 
 type alias Model =
     { pieceID : String
+    , readme : String
     , solution : Frame
     }
 
 
 init : String -> (Model, Cmd Msg)
 init firstPiece =
-    (Model (firstPiece) (Frame "" "" "" ""), Cmd.none)
+    let
+        initModel = Model (firstPiece) "" (Frame "" "" "" "")
+    in (initModel, getReadme initModel)
 
 type Msg =
     CoordinateChanged CoordinateID String
     | SubmitSolution
     | SubmissionStatus (Result Http.Error String)
+    | GetReadmeStatus (Result Http.Error String)
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -59,15 +64,19 @@ update msg model =
         SubmitSolution ->
             (model, submitSolution model)
         SubmissionStatus (Ok nextPieceID) ->
-            ({ model | pieceID = nextPieceID }, Cmd.none)
+            ({ model | pieceID = nextPieceID }, getReadme model)
         SubmissionStatus (error) ->
+            Debug.log (toString error) (model, Cmd.none)
+        GetReadmeStatus (Ok readmeString) ->
+            ({ model | readme = readmeString }, Cmd.none)
+        GetReadmeStatus (error) ->
             Debug.log (toString error) (model, Cmd.none)
 
 submitSolution : Model -> Cmd Msg
 submitSolution model =
     let
         solution = model.solution
-        url = baseUrl ++ "/link/braindump/"
+        url = baseUrl ++ "/link/gallaxy/"
               ++ model.pieceID
               ++ "?x1=" ++ solution.x1
               ++ "&y1=" ++ solution.y1
@@ -76,11 +85,20 @@ submitSolution model =
     in Http.send SubmissionStatus
         <| Http.getString url
 
+getReadme : Model -> Cmd Msg
+getReadme model =
+    let
+        url = baseUrl ++ "/puzzles/gallaxy/"
+              ++ model.pieceID ++ "/readme.md"
+    in Http.send GetReadmeStatus
+        <| Http.getString url
+
 view : Model -> Html Msg
 view model =
     div []
         [ h2 [] [ text model.pieceID ]
-        , img [ src (baseUrl ++ "/puzzles/braindump/" ++ model.pieceID ++ ".jpg") ] []
+        , img [ src (baseUrl ++ "/puzzles/gallaxy/" ++ model.pieceID ++ "/image.jpg") ] []
+        , Markdown.toHtml [class "content"] model.readme
         , input [ type_ "text", placeholder "x1", onInput (CoordinateChanged X1) ] []
         , input [ type_ "text", placeholder "y1", onInput (CoordinateChanged Y1) ] []
         , input [ type_ "text", placeholder "x2", onInput (CoordinateChanged X2) ] []
