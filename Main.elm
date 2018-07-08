@@ -4,6 +4,10 @@ import Html.Events exposing (..)
 import Http
 import Debug
 import Markdown
+import Material
+import Material.Textfield as Textfield
+import Material.Options as Options
+import Material.Scheme as Scheme
 
 baseUrl : String
 baseUrl = "http://localhost:8000"
@@ -34,13 +38,19 @@ type alias Model =
     { pieceID : String
     , readme : String
     , solution : Frame
+    -- UI
+    , mdl : Material.Model
     }
 
 
 init : String -> (Model, Cmd Msg)
 init firstPiece =
     let
-        initModel = Model (firstPiece) "" (Frame "" "" "" "")
+        initModel = Model
+                    (firstPiece)
+                    ""
+                    (Frame "" "" "" "")
+                    Material.model
     in (initModel, getReadme initModel)
 
 type Msg =
@@ -48,6 +58,8 @@ type Msg =
     | SubmitSolution
     | SubmissionStatus (Result Http.Error String)
     | GetReadmeStatus (Result Http.Error String)
+    | Mdl (Material.Msg Msg)
+
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -71,6 +83,8 @@ update msg model =
             ({ model | readme = readmeString }, Cmd.none)
         GetReadmeStatus (error) ->
             Debug.log (toString error) (model, Cmd.none)
+        Mdl (message_) ->
+            Material.update Mdl message_ model
 
 submitSolution : Model -> Cmd Msg
 submitSolution model =
@@ -99,12 +113,19 @@ view model =
         [ h2 [] [ text model.pieceID ]
         , img [ src (baseUrl ++ "/puzzles/gallaxy/" ++ model.pieceID ++ "/image.jpg") ] []
         , Markdown.toHtml [class "content"] model.readme
-        , input [ type_ "text", placeholder "x1", onInput (CoordinateChanged X1) ] []
+        , Textfield.render Mdl [0] model.mdl
+            [ Textfield.label "x1"
+            , Textfield.floatingLabel
+            , Textfield.text_
+            , Options.onInput (CoordinateChanged X1)
+            ]
+            []
         , input [ type_ "text", placeholder "y1", onInput (CoordinateChanged Y1) ] []
         , input [ type_ "text", placeholder "x2", onInput (CoordinateChanged X2) ] []
         , input [ type_ "text", placeholder "y2", onInput (CoordinateChanged Y2) ] []
         , button [ onClick SubmitSolution ] [ text "submit solution" ]
         ]
+        |> Scheme.top
 
 subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.none
