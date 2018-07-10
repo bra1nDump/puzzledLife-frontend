@@ -1,13 +1,19 @@
-import Html exposing(..)
-import Html.Attributes exposing(..)
-import Html.Events exposing (..)
+import Css exposing (..)
+import Html
+import Html.Styled exposing (..)
+import Html.Styled.Attributes exposing (css, href, src)
+-- import Html.Styled.Events exposing (onClick)
+
 import Http
 import Debug
 import Markdown
+
 import Material
 import Material.Textfield as Textfield
+import Material.Button as Button
 import Material.Options as Options
 import Material.Scheme as Scheme
+import Material.Grid exposing (grid, cell, size, Device(..))
 
 baseUrl : String
 baseUrl = "http://localhost:8000"
@@ -16,7 +22,7 @@ main : Program Never Model Msg
 main =
     Html.program
         { init = init "4760" -- default hash
-        , view = view
+        , view = view >> toUnstyled >> Scheme.top
         , update = update
         , subscriptions = subscriptions
         }
@@ -38,7 +44,6 @@ type alias Model =
     { pieceID : String
     , readme : String
     , solution : Frame
-    -- UI
     , mdl : Material.Model
     }
 
@@ -107,25 +112,28 @@ getReadme model =
     in Http.send GetReadmeStatus
         <| Http.getString url
 
+-- viewSubmissionCard : Model -> Html Msg
+-- viewSubmissionCard model = div [] []
+
+
 view : Model -> Html Msg
 view model =
     div []
-        [ h2 [] [ text model.pieceID ]
-        , img [ src (baseUrl ++ "/puzzles/gallaxy/" ++ model.pieceID ++ "/image.jpg") ] []
-        , Markdown.toHtml [class "content"] model.readme
-        , Textfield.render Mdl [0] model.mdl
-            [ Textfield.label "x1"
-            , Textfield.floatingLabel
-            , Textfield.text_
-            , Options.onInput (CoordinateChanged X1)
-            ]
-            []
-        , input [ type_ "text", placeholder "y1", onInput (CoordinateChanged Y1) ] []
-        , input [ type_ "text", placeholder "x2", onInput (CoordinateChanged X2) ] []
-        , input [ type_ "text", placeholder "y2", onInput (CoordinateChanged Y2) ] []
-        , button [ onClick SubmitSolution ] [ text "submit solution" ]
+        [ h1 [] [ text model.pieceID ]
+        , img [ src (baseUrl ++ "/puzzles/gallaxy/" ++ model.pieceID ++ "/image.jpg")
+              , css
+                  [ --display inlineBlock
+                  float left
+                  , width (px 400)
+                  , height (px 400)
+                  ]
+               ] []
+        , Markdown.toHtml [] model.readme |> fromUnstyled
+        -- , Button.render Mdl [0] model.mdl
+        --     [ Options.onClick SubmitSolution ]
+        --     [ text "submit solution" ] >> fromUnstyled
         ]
-        |> Scheme.top
+
 
 subscriptions : Model -> Sub Msg
 subscriptions _ = Sub.none
