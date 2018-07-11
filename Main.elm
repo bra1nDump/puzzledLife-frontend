@@ -1,11 +1,11 @@
 import Css exposing (..)
 import Css.Colors exposing(..)
---import Css.Foreign exposing(canvas)
 import Html
 import Html.Styled exposing (..)
 import Html.Styled.Attributes as Attributes exposing (css, href, src)
-import Svg.Styled.Attributes exposing (z)
--- import Html.Styled.Events exposing (onClick)
+
+import Canvas exposing (Size, Point, Canvas, Style(Color), DrawOp(..))
+import Color.exposing (Color)
 
 import Http
 import Debug
@@ -132,66 +132,64 @@ getReadme model =
     in Http.send GetReadmeStatus
         <| Http.getString url
 
--- viewSubmissionCard : Model -> Html Msg
--- viewSubmissionCard model = div [] []
+-- View
 
 relativePos : Pointer.Event -> ( Float, Float )
 relativePos event =
     event.pointer.offsetPos
 
-view : Model -> Html Msg
-view model =
+submissionContainer : Model -> Html Msg
+submissionContainer model =
     let
         {x1, y1, x2, y2} = model.frame
         frameWidth = abs (x2 - x1)
         frameHeight = abs (y2 - y1)
     in
+        div [ css [ display inlineBlock
+                  --, position absolute
+                  , float left
+                  , width (px 300)
+                  , height (px 300)
+                  , backgroundColor blue
+                  ]
+                  , Attributes.fromUnstyled <| Pointer.onDown (relativePos >> DownMsg)
+                  , Attributes.fromUnstyled <| Pointer.onMove (relativePos >> MoveMsg)
+                  , Attributes.fromUnstyled <| Pointer.onUp (relativePos >> UpMsg)
+            ]
+            [
+             img [ css
+                    [ position absolute
+                    ]
+              , src (baseUrl ++ "/puzzles/gallaxy/" ++ model.pieceID ++ "/image.jpg")
+                  ][]
+            , canvas --Canvas.initialize (Size 300 300)
+                  [ css
+                    [ position relative
+                    , top (px <| toFloat x1)
+                    , left (px <| toFloat y1)
+                    , width (px <| toFloat frameWidth)
+                    , height (px <| toFloat frameHeight)
+                    , color blue
+                    , backgroundColor blue
+                    ]
+                  ]
+                  []
+            ]
+
+view : Model -> Html Msg
+view model =
         div
         [ css
-          [ position relative
-          , display inlineBlock
+          [ --position relative
+          --, display inlineBlock
           ]
         ]
         [ h1 [] [ text model.pieceID ]
-          , div
-          [ css
-            [
-             position absolute
-            , float left
-            ]
-          ]
-          [ img [ src (baseUrl ++ "/puzzles/gallaxy/" ++ model.pieceID ++ "/image.jpg")
-                , css
-                  [ --display inlineBlock
-                  position absolute
-                  
-                  -- , width (px 400)
-                  -- , height (px 400)
-                  ]
-                , Attributes.fromUnstyled <| Pointer.onDown (relativePos >> DownMsg)
-                , Attributes.fromUnstyled <| Pointer.onMove (relativePos >> MoveMsg)
-                , Attributes.fromUnstyled <| Pointer.onUp (relativePos >> UpMsg)
-                , z "1"
-                ]
-                []
-          , canvas
-                [ css
-                  [ position relative
-                  , top (px <| toFloat x1)
-                  , left (px <| toFloat y1)
-                  , width (px <| toFloat frameWidth)
-                  , height (px <| toFloat frameHeight)
-                  , color blue
-                  , backgroundColor blue
-                  ]
-                , z "20"
-                ]
-                []
-          ]
+        , submissionContainer model
         , Markdown.toHtml [] model.readme |> fromUnstyled
-        -- , Button.render Mdl [0] model.mdl
-        --     [ Options.onClick SubmitSolution ]
-        --     [ text "submit solution" ] >> fromUnstyled
+        , Button.render Mdl [0] model.mdl
+            [ Options.onClick SubmitSolution ]
+            [ Html.text "submit solution" ] |> fromUnstyled
         ]
 
 

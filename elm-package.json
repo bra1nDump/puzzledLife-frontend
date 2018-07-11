@@ -14,7 +14,8 @@
         "evancz/elm-markdown": "3.0.1 <= v < 4.0.0",
         "debois/elm-mdl": "8.0.0 <= v < 9.0.0",
         "rtfeldman/elm-css": "14.0.0 <= v < 15.0.0",
-        "mpizenberg/elm-pointer-events": "2.0.1 <= v < 3.0.0"
+        "mpizenberg/elm-pointer-events": "2.0.1 <= v < 3.0.0",
+        "elm-canvas/elm-canvas": "git@github.com/Elm-Canvas/elm-canvas.git"
     },
     "elm-version": "0.18.0 <= v < 0.19.0"
 }
