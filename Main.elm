@@ -1,7 +1,10 @@
 import Css exposing (..)
+import Css.Colors exposing(..)
+--import Css.Foreign exposing(canvas)
 import Html
 import Html.Styled exposing (..)
-import Html.Styled.Attributes exposing (css, href, src)
+import Html.Styled.Attributes as Attributes exposing (css, href, src)
+import Svg.Styled.Attributes exposing (z)
 -- import Html.Styled.Events exposing (onClick)
 
 import Http
@@ -15,13 +18,15 @@ import Material.Options as Options
 import Material.Scheme as Scheme
 import Material.Grid exposing (grid, cell, size, Device(..))
 
+import Pointer
+
 baseUrl : String
 baseUrl = "http://localhost:8000"
 
 main : Program Never Model Msg
 main =
     Html.program
-        { init = init "4760" -- default hash
+        { init = init "2343" -- default hash
         , view = view >> toUnstyled >> Scheme.top
         , update = update
         , subscriptions = subscriptions
@@ -34,16 +39,16 @@ type CoordinateID =
     | Y2
 
 type alias Frame =
-    { x1 : String
-    , y1 : String
-    , x2 : String
-    , y2 : String
+    { x1 : Int
+    , y1 : Int
+    , x2 : Int
+    , y2 : Int
     }
 
 type alias Model =
     { pieceID : String
     , readme : String
-    , solution : Frame
+    , frame : Frame
     , mdl : Material.Model
     }
 
@@ -54,30 +59,24 @@ init firstPiece =
         initModel = Model
                     (firstPiece)
                     ""
-                    (Frame "" "" "" "")
+                    (Frame 0 0 0 0)
                     Material.model
     in (initModel, getReadme initModel)
 
 type Msg =
-    CoordinateChanged CoordinateID String
-    | SubmitSolution
+    SubmitSolution
     | SubmissionStatus (Result Http.Error String)
     | GetReadmeStatus (Result Http.Error String)
+    | DownMsg (Float, Float)
+    | MoveMsg (Float, Float)
+    | UpMsg (Float, Float)
+    -- internal
     | Mdl (Material.Msg Msg)
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
-        CoordinateChanged id value ->
-            let solution = model.solution
-                newSolution =
-                    case id of
-                        X1 -> { solution | x1 = value }
-                        Y1 -> { solution | y1 = value }
-                        X2 -> { solution | x2 = value }
-                        Y2 -> { solution | y2 = value }
-            in ({ model | solution = newSolution }, Cmd.none)
         SubmitSolution ->
             (model, submitSolution model)
         SubmissionStatus (Ok nextPieceID) ->
@@ -88,19 +87,40 @@ update msg model =
             ({ model | readme = readmeString }, Cmd.none)
         GetReadmeStatus (error) ->
             Debug.log (toString error) (model, Cmd.none)
+        DownMsg (x, y) ->
+            Debug.log (toString (x,y))
+                ({model | frame =
+                      let
+                          {x2, y2} = model.frame
+                      in Frame (x |> floor) (y |> floor) x2 y2
+                 }, Cmd.none)
+        MoveMsg (x, y) ->
+            Debug.log (toString (x,y))
+                ({model | frame =
+                      let
+                          {x1, y1} = model.frame
+                      in Frame x1 y1 (x |> floor) (y |> floor)
+                 }, Cmd.none)
+        UpMsg (x, y) ->
+            Debug.log (toString (x,y))
+                ({model | frame =
+                      let
+                          {x1, y1} = model.frame
+                      in Frame x1 y1 (x |> floor) (y |> floor)
+                 }, Cmd.none)
         Mdl (message_) ->
             Material.update Mdl message_ model
 
 submitSolution : Model -> Cmd Msg
 submitSolution model =
     let
-        solution = model.solution
+        {x1, y1, x2, y2} = model.frame
         url = baseUrl ++ "/link/gallaxy/"
               ++ model.pieceID
-              ++ "?x1=" ++ solution.x1
-              ++ "&y1=" ++ solution.y1
-              ++ "&x2=" ++ solution.x2
-              ++ "&y2=" ++ solution.y2
+              ++ "?x1=" ++ toString x1
+              ++ "&y1=" ++ toString y1
+              ++ "&x2=" ++ toString x2
+              ++ "&y2=" ++ toString y2
     in Http.send SubmissionStatus
         <| Http.getString url
 
@@ -115,19 +135,59 @@ getReadme model =
 -- viewSubmissionCard : Model -> Html Msg
 -- viewSubmissionCard model = div [] []
 
+relativePos : Pointer.Event -> ( Float, Float )
+relativePos event =
+    event.pointer.offsetPos
 
 view : Model -> Html Msg
 view model =
-    div []
+    let
+        {x1, y1, x2, y2} = model.frame
+        frameWidth = abs (x2 - x1)
+        frameHeight = abs (y2 - y1)
+    in
+        div
+        [ css
+          [ position relative
+          , display inlineBlock
+          ]
+        ]
         [ h1 [] [ text model.pieceID ]
-        , img [ src (baseUrl ++ "/puzzles/gallaxy/" ++ model.pieceID ++ "/image.jpg")
-              , css
+          , div
+          [ css
+            [
+             position absolute
+            , float left
+            ]
+          ]
+          [ img [ src (baseUrl ++ "/puzzles/gallaxy/" ++ model.pieceID ++ "/image.jpg")
+                , css
                   [ --display inlineBlock
-                  float left
-                  , width (px 400)
-                  , height (px 400)
+                  position absolute
+                  
+                  -- , width (px 400)
+                  -- , height (px 400)
                   ]
-               ] []
+                , Attributes.fromUnstyled <| Pointer.onDown (relativePos >> DownMsg)
+                , Attributes.fromUnstyled <| Pointer.onMove (relativePos >> MoveMsg)
+                , Attributes.fromUnstyled <| Pointer.onUp (relativePos >> UpMsg)
+                , z "1"
+                ]
+                []
+          , canvas
+                [ css
+                  [ position relative
+                  , top (px <| toFloat x1)
+                  , left (px <| toFloat y1)
+                  , width (px <| toFloat frameWidth)
+                  , height (px <| toFloat frameHeight)
+                  , color blue
+                  , backgroundColor blue
+                  ]
+                , z "20"
+                ]
+                []
+          ]
         , Markdown.toHtml [] model.readme |> fromUnstyled
         -- , Button.render Mdl [0] model.mdl
         --     [ Options.onClick SubmitSolution ]
