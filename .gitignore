@@ -1,7 +1,5 @@
 ## elm
 elm-stuff/
-*.html
-*.js
 
 ## mac os
 .DS_Store
