@@ -15,7 +15,8 @@
         "debois/elm-mdl": "8.0.0 <= v < 9.0.0",
         "rtfeldman/elm-css": "14.0.0 <= v < 15.0.0",
         "mpizenberg/elm-pointer-events": "2.0.1 <= v < 3.0.0",
-        "elm-canvas/elm-canvas": "0.0.0 <= v < 1.0.0"
+        "elm-canvas/elm-canvas": "0.0.0 <= v < 1.0.0",
+        "lukewestby/elm-http-builder": "5.2.0 <= v < 6.0.0"
     },
     "dependency-sources": {
         "elm-canvas/elm-canvas": "https://github.com/Elm-Canvas/elm-canvas"

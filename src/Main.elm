@@ -9,8 +9,13 @@ import Html.Styled.Attributes as Attributes exposing (css, href, src)
 import Canvas exposing (Size, Point, Canvas, Style(Color), DrawOp(..))
 import Color exposing (Color)
 
-import Http
+import Http exposing (jsonBody)
+import HttpBuilder
 import Debug
+import List exposing (map)
+import Json.Decode as Decode
+import Json.Encode as Encode
+
 import Markdown
 
 import Material
@@ -52,6 +57,8 @@ type alias Model =
     , pieceSize : { width: Int, height: Int }
     , readme : String
     , frame : Frame
+    , isSelectingFrame : Bool
+    , frames : List Frame
     , mdl : Material.Model
     }
 
@@ -64,11 +71,14 @@ init firstPiece =
                     { width = 0, height = 0 }
                     ""
                     (Frame 0 0 0 0)
+                    False
+                    []
                     Material.model
     in (initModel, getReadme initModel)
 
 type Msg =
     SubmitSolution
+    | ClearSelection
     | SubmissionStatus (Result Http.Error String)
     | GetReadmeStatus (Result Http.Error String)
     | DownMsg (Float, Float)
@@ -84,6 +94,8 @@ update msg model =
     case msg of
         SubmitSolution ->
             (model, submitSolution model)
+        ClearSelection ->
+            ({ model | frames = [], frame = Frame 0 0 0 0 }, Cmd.none)
         SubmissionStatus (Ok nextPieceID) ->
             ({ model | pieceID = nextPieceID }, getReadme model)
         SubmissionStatus (error) ->
@@ -93,22 +105,26 @@ update msg model =
         GetReadmeStatus (error) ->
             (model, Cmd.none)
         DownMsg (x, y) ->
-                ({model | frame =
-                      let
-                          {x2, y2} = model.frame
-                      in Frame (x |> floor) (y |> floor) x2 y2
+                ({ model | frame =
+                       Frame (x |> floor) (y |> floor) (x |> floor) (y |> floor)
+                       , isSelectingFrame = True
                  }, Cmd.none)
         MoveMsg (x, y) ->
-                ({model | frame =
-                      let
-                          {x1, y1} = model.frame
-                      in Frame x1 y1 (x |> floor) (y |> floor)
-                 }, Cmd.none)
+                (if model.isSelectingFrame then
+                     { model | frame =
+                           let
+                               {x1, y1} = model.frame
+                           in Frame x1 y1 (x |> floor) (y |> floor)
+                     }
+                else model, Cmd.none)
         UpMsg (x, y) ->
-                ({model | frame =
-                      let
-                          {x1, y1} = model.frame
-                      in Frame x1 y1 (x |> floor) (y |> floor)
+                ({ model | frames =
+                       let
+                           {x1, y1} = model.frame
+                           newFrame = Frame x1 y1 (x |> floor) (y |> floor)
+                       in newFrame :: model.frames
+                       , isSelectingFrame = False
+                       , frame = Frame 0 0 0 0
                  }, Cmd.none)
         DimensionsResponse (w, h) ->
             Debug.log (toString (w, h))
@@ -124,15 +140,29 @@ imageLink model = baseUrl ++ "/puzzles/gallaxy/"
 submitSolution : Model -> Cmd Msg
 submitSolution model =
     let
-        {x1, y1, x2, y2} = model.frame
+        json = model.frame :: model.frames
+             |> List.filter
+                (\frame ->
+                     let {x1, y1, x2, y2} = frame
+                     in (x1 /= x2) && (y1 /= y2)
+                )
+             |> List.map
+                (\frame ->
+                     let {x1, y1, x2, y2} = frame
+                     in Encode.object
+                         [ ("x1", Encode.int x1)
+                         , ("y1", Encode.int y1)
+                         , ("x2", Encode.int x2)
+                         , ("y2", Encode.int y2)
+                         ]
+                )
+             |> Encode.list
         url = baseUrl ++ "/link/gallaxy/"
               ++ model.pieceID
-              ++ "?x1=" ++ toString x1
-              ++ "&y1=" ++ toString y1
-              ++ "&x2=" ++ toString x2
-              ++ "&y2=" ++ toString y2
-    in Http.send SubmissionStatus
-        <| Http.getString url
+        request = HttpBuilder.post url
+                  |> HttpBuilder.withJsonBody json
+                  |> HttpBuilder.withExpectString
+    in HttpBuilder.send SubmissionStatus request
 
 getReadme : Model -> Cmd Msg
 getReadme model =
@@ -148,15 +178,20 @@ relativePos : Pointer.Event -> ( Float, Float )
 relativePos event =
     event.pointer.offsetPos
 
+drawRectangles : List Frame -> DrawOp
+drawRectangles frames =
+    let drawFrame frame =
+            let
+                {x1, y1, x2, y2} = frame
+                frameWidth = x2 - x1
+                frameHeight = y2 - y1
+            in rectangle (Point (toFloat x1) (toFloat y1)) frameWidth frameHeight (Color.rgba 0 0 255 0.5)
+        operationList = List.map drawFrame frames
+    in Canvas.batch operationList
 
 regions : Model -> DrawOp
 regions model =
-    let
-        {x1, y1, x2, y2} = model.frame
-        frameWidth = x2 - x1
-        frameHeight = y2 - y1
-    in
-        [ rectangle (Point (toFloat x1) (toFloat y1)) frameWidth frameHeight (Color.rgba 0 0 255 0.5)
+        [ drawRectangles <| model.frame :: model.frames
         , FillStyle <| Color Color.white
         ] |> Canvas.batch
 
@@ -173,30 +208,24 @@ submissionContainer model =
     div [ css [ display inlineBlock
               , position relative
               , float left
-              , width (px <| toFloat model.pieceSize.width)
-              , height (px <| toFloat model.pieceSize.height)
-              , maxWidth (px <| toFloat model.pieceSize.width)
-              , maxHeight (px <| toFloat model.pieceSize.height)
-              , backgroundColor blue
+              , width (px <| 40 + toFloat model.pieceSize.width)
+              , height (px <| 40 + toFloat model.pieceSize.height)
               ]
         , Attributes.fromUnstyled <| Pointer.onDown (relativePos >> DownMsg)
         , Attributes.fromUnstyled <| Pointer.onMove (relativePos >> MoveMsg)
         , Attributes.fromUnstyled <| Pointer.onUp (relativePos >> UpMsg)
         ]
-    [
-     img [ css
+    [ img [ css
            [ position absolute
-           , zIndex (int 1)
            , backgroundSize contain
-           , maxWidth inherit
-           , maxHeight inherit
+           , zIndex (int 1)
            ]
          , src (baseUrl ++ "/puzzles/gallaxy/" ++ model.pieceID ++ "/image.jpg")
          ][]
     , div
          [ css
            [ position absolute
-           , zIndex (int 2)
+           , zIndex (int 20)
            ]
          ]
          (if model.pieceSize.width /= 0 then
@@ -207,14 +236,23 @@ submissionContainer model =
              |> fromUnstyled
              ]
          else [])
+    , div
+          [ css
+            [ position absolute
+            , top (px <| toFloat model.pieceSize.height)
+            ]
+          ]
+          [ Button.render Mdl [0] model.mdl
+                [ Options.onClick ClearSelection ]
+                [ Html.text "clear selection" ] |> fromUnstyled
+          ]
     ]
 
 view : Model -> Html Msg
 view model =
     div
     []
-    [ h1 [] [ text model.pieceID ]
-    , submissionContainer model
+    [ submissionContainer model
     , Markdown.toHtml [] model.readme |> fromUnstyled
     , Button.render Mdl [0] model.mdl
         [ Options.onClick SubmitSolution ]

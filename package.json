@@ -1,0 +1,22 @@
+{
+  "name": "puzzled-life-frontend",
+  "version": "1.0.0",
+  "description": "puzzledLife-frontend ==",
+  "main": "index.js",
+  "scripts": {
+    "test": "gulp test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bra1nDump/puzzledLife-frontend.git"
+  },
+  "author": "brainddump@ucla.edu",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/bra1nDump/puzzledLife-frontend/issues"
+  },
+  "homepage": "https://github.com/bra1nDump/puzzledLife-frontend#readme",
+  "dependencies": {
+    "gulp": "^3.9.1"
+  }
+}

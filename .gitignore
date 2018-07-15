@@ -1,5 +1,12 @@
 ## elm
 elm-stuff/
+*.js
+
+## gulp build
+build/
+
+## npm
+node_modules/
 
 ## mac os
 .DS_Store
