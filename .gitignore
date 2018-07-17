@@ -1,6 +1,5 @@
 ## elm
 elm-stuff/
-*.js
 
 ## gulp build
 public/
