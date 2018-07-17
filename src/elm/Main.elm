@@ -28,7 +28,7 @@ import Material.Grid exposing (grid, cell, size, Device(..))
 import Pointer
 
 baseUrl : String
-baseUrl = "http://localhost:8000"
+baseUrl = "http://localhost:8080"
 
 main : Program Never Model Msg
 main =
@@ -134,7 +134,7 @@ update msg model =
             Material.update Mdl message_ model
 
 imageLink : Model -> String
-imageLink model = baseUrl ++ "/puzzles/gallaxy/"
+imageLink model = baseUrl ++ "/api/puzzles/gallaxy/"
                   ++ model.pieceID ++ "/image.jpg"
 
 submitSolution : Model -> Cmd Msg
@@ -157,7 +157,7 @@ submitSolution model =
                          ]
                 )
              |> Encode.list
-        url = baseUrl ++ "/link/gallaxy/"
+        url = baseUrl ++ "/api/link/gallaxy/"
               ++ model.pieceID
         request = HttpBuilder.post url
                   |> HttpBuilder.withJsonBody json
@@ -167,7 +167,7 @@ submitSolution model =
 getReadme : Model -> Cmd Msg
 getReadme model =
     let
-        url = baseUrl ++ "/puzzles/gallaxy/"
+        url = baseUrl ++ "/api/puzzles/gallaxy/"
               ++ model.pieceID ++ "/readme.md"
     in Http.send GetReadmeStatus
         <| Http.getString url
@@ -218,14 +218,14 @@ submissionContainer model =
     [ img [ css
            [ position absolute
            , backgroundSize contain
-           , zIndex (int 1)
+           --, zIndex (int 1)
            ]
-         , src (baseUrl ++ "/puzzles/gallaxy/" ++ model.pieceID ++ "/image.jpg")
+         , src (baseUrl ++ "/api/puzzles/gallaxy/" ++ model.pieceID ++ "/image.jpg")
          ][]
     , div
          [ css
            [ position absolute
-           , zIndex (int 20)
+           --, zIndex (int 20)
            ]
          ]
          (if model.pieceSize.width /= 0 then

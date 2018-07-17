@@ -1,20 +1,17 @@
 <!doctype html>
 <html>
     <head>
-        <script type="text/javascript" src="http://localhost:8000/public/main.js"></script>
+        <script type="text/javascript" src="http://localhost:8080/elm-app.js"></script>
     </head>
     <body>
         <div id="main"></div>
         <script type="text/javascript">
          var app = Elm.Main.fullscreen();
 
-         console.log('pettuux');
          app.ports.dimensionsRequest.subscribe((imageURL) => {
-             console.log('peetux');
              let image = new Image();
              image.src = imageURL;
              image.onload = () => {
-                 console.log("loaded image")
                  app.ports.dimensionsResponse.send([image.width, image.height]);
              };
          });

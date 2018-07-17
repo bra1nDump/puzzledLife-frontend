@@ -3,7 +3,7 @@ elm-stuff/
 *.js
 
 ## gulp build
-build/
+public/
 
 ## npm
 node_modules/
