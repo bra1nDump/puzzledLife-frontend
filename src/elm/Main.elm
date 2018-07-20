@@ -1,13 +1,10 @@
-port module Main exposing (main)
+module Main exposing (main)
 
 import Css exposing (..)
 import Css.Colors exposing (..)
 import Html
 import Html.Styled exposing (..)
 import Html.Styled.Attributes as Attributes exposing (css, href, src)
-
-import Canvas exposing (Size, Point, Canvas, Style(Color), DrawOp(..))
-import Color exposing (Color)
 
 import Http exposing (jsonBody)
 import HttpBuilder
@@ -19,128 +16,106 @@ import Json.Encode as Encode
 import Markdown
 
 import Material
-import Material.Textfield as Textfield
 import Material.Button as Button
 import Material.Options as Options
+import Material.Layout as Layout
+import Material.Tabs as Tabs
 import Material.Scheme as Scheme
-import Material.Grid exposing (grid, cell, size, Device(..))
 
-import Pointer
+import Piece exposing (..)
 
-baseUrl : String
-baseUrl = "http://localhost:8080"
+type alias Model =
+    { mdl : Material.Model
+    , selectedTab : Int
+    , pieceID : String
+    , piece : Piece.Piece
+    , readme : String
+    }
+
+type Msg =
+    Mdl (Material.Msg Msg)
+    | SwitchedTab (Int)
+    | PieceMsg (Piece.Msg)
+    | SubmitSolution
+    | ClearSelection
+    | SubmissionStatus (Result Http.Error String)
+    | GetReadmeStatus (Result Http.Error String)
+
 
 main : Program Never Model Msg
 main =
     Html.program
         { init = init "2343" -- default hash
-        , view = view >> toUnstyled >> Scheme.top
+        , view = view
         , update = update
         , subscriptions = subscriptions
         }
 
-type CoordinateID =
-    X1
-    | Y1
-    | X2
-    | Y2
-
-type alias Frame =
-    { x1 : Int
-    , y1 : Int
-    , x2 : Int
-    , y2 : Int
-    }
-
-type alias Model =
-    { pieceID : String
-    , pieceSize : { width: Int, height: Int }
-    , readme : String
-    , frame : Frame
-    , isSelectingFrame : Bool
-    , frames : List Frame
-    , mdl : Material.Model
-    }
-
+-- helpers
+baseUrl : String
+baseUrl = "http://localhost:8080"
 
 init : String -> (Model, Cmd Msg)
 init firstPiece =
     let
+        (piece, pieceCmd) = Piece.model PieceMsg <| pieceUrl firstPiece
         initModel = Model
-                    firstPiece
-                    { width = 0, height = 0 }
-                    ""
-                    (Frame 0 0 0 0)
-                    False
-                    []
                     Material.model
-    in (initModel, getReadme initModel)
-
-type Msg =
-    SubmitSolution
-    | ClearSelection
-    | SubmissionStatus (Result Http.Error String)
-    | GetReadmeStatus (Result Http.Error String)
-    | DownMsg (Float, Float)
-    | MoveMsg (Float, Float)
-    | UpMsg (Float, Float)
-    | DimensionsResponse (Int, Int)
-    -- internal
-    | Mdl (Material.Msg Msg)
-
+                    0
+                    firstPiece
+                    piece
+                    ""
+    in ({ initModel | mdl = Layout.setTabsWidth 200 initModel.mdl }
+       , Cmd.batch
+           [ getReadme initModel.pieceID
+           , pieceCmd
+           , Layout.sub0 Mdl
+           ]
+       )
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of
+        Mdl (message_) ->
+            Material.update Mdl message_ model
+        PieceMsg (message_) ->
+            let (piece, pieceCmd) = Piece.update message_ model.piece
+            in ({ model | piece = piece}, pieceCmd)
+        SwitchedTab (index) ->
+            ({ model | selectedTab = index }, Cmd.none)
         SubmitSolution ->
             (model, submitSolution model)
         ClearSelection ->
-            ({ model | frames = [], frame = Frame 0 0 0 0 }, Cmd.none)
+            let (piece, pieceCmd) = Piece.model PieceMsg <| pieceUrl model.pieceID
+            in ({ model | piece = piece }, pieceCmd)
         SubmissionStatus (Ok nextPieceID) ->
-            ({ model | pieceID = nextPieceID }, getReadme model)
+            let (piece, pieceCmd) = Piece.model PieceMsg <| pieceUrl nextPieceID
+                newModel =
+                    { model
+                        | pieceID = nextPieceID
+                        , piece = piece
+                    }
+            in (newModel,
+                    Cmd.batch
+                    [ getReadme nextPieceID
+                    , pieceCmd
+                    ]
+               )
         SubmissionStatus (error) ->
             Debug.log (toString error) (model, Cmd.none)
         GetReadmeStatus (Ok readmeString) ->
-            ({ model | readme = readmeString }, dimensionsRequest <| imageLink model)
+            ({ model | readme = readmeString }, Cmd.none)
         GetReadmeStatus (error) ->
             (model, Cmd.none)
-        DownMsg (x, y) ->
-                ({ model | frame =
-                       Frame (x |> floor) (y |> floor) (x |> floor) (y |> floor)
-                       , isSelectingFrame = True
-                 }, Cmd.none)
-        MoveMsg (x, y) ->
-                (if model.isSelectingFrame then
-                     { model | frame =
-                           let
-                               {x1, y1} = model.frame
-                           in Frame x1 y1 (x |> floor) (y |> floor)
-                     }
-                else model, Cmd.none)
-        UpMsg (x, y) ->
-                ({ model | frames =
-                       let
-                           {x1, y1} = model.frame
-                           newFrame = Frame x1 y1 (x |> floor) (y |> floor)
-                       in newFrame :: model.frames
-                       , isSelectingFrame = False
-                       , frame = Frame 0 0 0 0
-                 }, Cmd.none)
-        DimensionsResponse (w, h) ->
-            Debug.log (toString (w, h))
-            ({ model | pieceSize = { width = w, height = h } },
-                 Cmd.none)
-        Mdl (message_) ->
-            Material.update Mdl message_ model
 
-imageLink : Model -> String
-imageLink model = baseUrl ++ "/api/puzzles/gallaxy/"
-                  ++ model.pieceID ++ "/image.jpg"
+pieceUrl : String -> String
+pieceUrl pieceID = baseUrl ++ "/api/puzzles/gallaxy/"
+                 ++ pieceID ++ "/image.jpg"
 
 submitSolution : Model -> Cmd Msg
 submitSolution model =
     let
-        json = model.frame :: model.frames
+        json = model.piece.frames
              |> List.filter
                 (\frame ->
                      let {x1, y1, x2, y2} = frame
@@ -164,108 +139,111 @@ submitSolution model =
                   |> HttpBuilder.withExpectString
     in HttpBuilder.send SubmissionStatus request
 
-getReadme : Model -> Cmd Msg
-getReadme model =
+getReadme : String -> Cmd Msg
+getReadme pieceID =
     let
         url = baseUrl ++ "/api/puzzles/gallaxy/"
-              ++ model.pieceID ++ "/readme.md"
+              ++ pieceID ++ "/readme.md"
     in Http.send GetReadmeStatus
         <| Http.getString url
 
--- View
-
-relativePos : Pointer.Event -> ( Float, Float )
-relativePos event =
-    event.pointer.offsetPos
-
-drawRectangles : List Frame -> DrawOp
-drawRectangles frames =
-    let drawFrame frame =
-            let
-                {x1, y1, x2, y2} = frame
-                frameWidth = x2 - x1
-                frameHeight = y2 - y1
-            in rectangle (Point (toFloat x1) (toFloat y1)) frameWidth frameHeight (Color.rgba 0 0 255 0.5)
-        operationList = List.map drawFrame frames
-    in Canvas.batch operationList
-
-regions : Model -> DrawOp
-regions model =
-        [ drawRectangles <| model.frame :: model.frames
-        , FillStyle <| Color Color.white
-        ] |> Canvas.batch
-
-rectangle : Point -> Int -> Int -> Color.Color -> DrawOp
-rectangle point width height color =
-    [ BeginPath
-    , Rect point (Size width height)
-    , FillStyle <| Color color
-    , Fill
-    ] |> Canvas.batch
-
-submissionContainer : Model -> Html Msg
-submissionContainer model =
-    div [ css [ display inlineBlock
-              , position relative
-              , float left
-              , width (px <| 40 + toFloat model.pieceSize.width)
-              , height (px <| 40 + toFloat model.pieceSize.height)
-              ]
-        , Attributes.fromUnstyled <| Pointer.onDown (relativePos >> DownMsg)
-        , Attributes.fromUnstyled <| Pointer.onMove (relativePos >> MoveMsg)
-        , Attributes.fromUnstyled <| Pointer.onUp (relativePos >> UpMsg)
-        ]
-    [ img [ css
-           [ position absolute
-           , backgroundSize contain
-           --, zIndex (int 1)
-           ]
-         , src (baseUrl ++ "/api/puzzles/gallaxy/" ++ model.pieceID ++ "/image.jpg")
-         ][]
-    , div
-         [ css
-           [ position absolute
-           --, zIndex (int 20)
-           ]
-         ]
-         (if model.pieceSize.width /= 0 then
-             [
-              Canvas.initialize (Size model.pieceSize.width model.pieceSize.height)
-             |> Canvas.draw (regions model)
-             |> Canvas.toHtml []
-             |> fromUnstyled
-             ]
-         else [])
-    , div
-          [ css
-            [ position absolute
-            , top (px <| toFloat model.pieceSize.height)
-            ]
-          ]
-          [ Button.render Mdl [0] model.mdl
-                [ Options.onClick ClearSelection ]
-                [ Html.text "clear selection" ] |> fromUnstyled
-          ]
+-- view
+buttons : Model -> Html Msg
+buttons model =
+    div
+    [ css
+      [ width (px <| toFloat <| Tuple.first model.piece.size)
+      , displayFlex
+      , flexDirection row
+      , justifyContent center
+      ]
+    ]
+    [ Button.render Mdl [0] model.mdl
+          [ Options.onClick ClearSelection ]
+          [ Html.text "Clear" ] |> fromUnstyled
+    , Button.render Mdl [0] model.mdl
+          [ Options.onClick SubmitSolution ]
+          [ Html.text "Submit" ] |> fromUnstyled
     ]
 
-view : Model -> Html Msg
-view model =
+header : Model -> Html Msg
+header model =
+    div
+    [ css
+      [ height (px 30)
+      , color olive
+      ]
+    ]
+    []
+
+tabs : List (Html Msg)
+tabs =
+    [ text "explore"
+    , text "create"
+    , text "about"
+    ]
+
+visitorView : Model -> Html Msg
+visitorView model =
+    div
+    [ css
+      [ margin (px 10) ]
+    ]
+    [ div
+      [ css
+        [ display inlineBlock
+        , float left
+        , marginRight (px 30)
+        ]
+      ]
+      [ Piece.render PieceMsg model.piece
+      , buttons model
+      ]
+    , Markdown.toHtml
+        []
+        model.readme |> fromUnstyled
+    ]
+
+creatorView : Model -> Html Msg
+creatorView model =
     div
     []
-    [ submissionContainer model
-    , Markdown.toHtml [] model.readme |> fromUnstyled
-    , Button.render Mdl [0] model.mdl
-        [ Options.onClick SubmitSolution ]
-        [ Html.text "submit solution" ] |> fromUnstyled
+    []
+
+aboutView : Html Msg
+aboutView =
+    div
+    [ css
+      [ backgroundColor blue
+      , height (pct 100)
+      , width (pct 100)
+      ]
     ]
+    [text "lol"]
+
+view : Model -> Html.Html Msg
+view model =
+    Layout.render Mdl model.mdl
+    [ Layout.selectedTab model.selectedTab
+    , Layout.onSelectTab SwitchedTab
+    , Layout.fixedHeader
+    ]
+    { header = [ header model |> toUnstyled ]
+    , drawer = []
+    , tabs = (List.map toUnstyled tabs, [])
+    , main =
+        List.map toUnstyled
+        [ case model.selectedTab of
+              0 -> visitorView model
+              1 -> creatorView model
+              _ -> aboutView
+        ]
+    } |> Scheme.top
 
 
 subscriptions : Model -> Sub Msg
-subscriptions _ =
-    dimensionsResponse DimensionsResponse
-
--- we will send request for image dimensions
--- through this port
-port dimensionsRequest : String -> Cmd msg
-
-port dimensionsResponse : ((Int, Int) -> msg) -> Sub msg
+subscriptions model =
+    Sub.batch
+    [ Piece.subscriptions PieceMsg
+    , Layout.subs Mdl model.mdl
+    ]
