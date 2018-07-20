@@ -6,9 +6,6 @@ import Html
 import Html.Styled exposing (..)
 import Html.Styled.Attributes as Attributes exposing (css, href, src)
 
-import Http exposing (jsonBody)
-import HttpBuilder
-import Debug
 import List exposing (map)
 import Json.Decode as Decode
 import Json.Encode as Encode
@@ -16,18 +13,20 @@ import Json.Encode as Encode
 import Markdown
 
 import Material
-import Material.Button as Button
-import Material.Options as Options
 import Material.Layout as Layout
 import Material.Tabs as Tabs
+import Material.List as MList
+import Material.Button as Button
+import Material.Options as Options
 import Material.Scheme as Scheme
 
-import Piece exposing (..)
+import Piece
+import RequestManager exposing (..)
 
 type alias Model =
     { mdl : Material.Model
     , selectedTab : Int
-    , pieceID : String
+    , pieceId : (String, String)
     , piece : Piece.Piece
     , readme : String
     }
@@ -38,36 +37,32 @@ type Msg =
     | PieceMsg (Piece.Msg)
     | SubmitSolution
     | ClearSelection
-    | SubmissionStatus (Result Http.Error String)
-    | GetReadmeStatus (Result Http.Error String)
+    | SubmissionStatus (Result RequestError String)
+    | GetReadmeStatus (Result RequestError String)
 
 
 main : Program Never Model Msg
 main =
     Html.program
-        { init = init "2343" -- default hash
+        { init = init ("gallaxy", "2343") -- default hash
         , view = view
         , update = update
         , subscriptions = subscriptions
         }
 
--- helpers
-baseUrl : String
-baseUrl = "http://localhost:8080"
-
-init : String -> (Model, Cmd Msg)
-init firstPiece =
+init : (String, String) -> (Model, Cmd Msg)
+init pieceId =
     let
-        (piece, pieceCmd) = Piece.model PieceMsg <| pieceUrl firstPiece
+        (piece, pieceCmd) = Piece.model PieceMsg <| imageUrl pieceId
         initModel = Model
                     Material.model
                     0
-                    firstPiece
+                    pieceId
                     piece
                     ""
     in ({ initModel | mdl = Layout.setTabsWidth 200 initModel.mdl }
        , Cmd.batch
-           [ getReadme initModel.pieceID
+           [ readmeRequest GetReadmeStatus initModel.pieceId
            , pieceCmd
            , Layout.sub0 Mdl
            ]
@@ -84,20 +79,21 @@ update msg model =
         SwitchedTab (index) ->
             ({ model | selectedTab = index }, Cmd.none)
         SubmitSolution ->
-            (model, submitSolution model)
+            (model, nextRequest SubmissionStatus model.piece.frames model.pieceId)
         ClearSelection ->
-            let (piece, pieceCmd) = Piece.model PieceMsg <| pieceUrl model.pieceID
+            let (piece, pieceCmd) = Piece.model PieceMsg <| imageUrl model.pieceId
             in ({ model | piece = piece }, pieceCmd)
-        SubmissionStatus (Ok nextPieceID) ->
-            let (piece, pieceCmd) = Piece.model PieceMsg <| pieceUrl nextPieceID
+        SubmissionStatus (Ok nextPieceId) ->
+            let (puzzleId, _) = model.pieceId
+                (piece, pieceCmd) = Piece.model PieceMsg <| imageUrl (puzzleId, nextPieceId)
                 newModel =
                     { model
-                        | pieceID = nextPieceID
+                        | pieceId = (puzzleId, nextPieceId)
                         , piece = piece
                     }
-            in (newModel,
+            in Debug.log (nextPieceId) (newModel,
                     Cmd.batch
-                    [ getReadme nextPieceID
+                    [ readmeRequest GetReadmeStatus model.pieceId
                     , pieceCmd
                     ]
                )
@@ -107,45 +103,6 @@ update msg model =
             ({ model | readme = readmeString }, Cmd.none)
         GetReadmeStatus (error) ->
             (model, Cmd.none)
-
-pieceUrl : String -> String
-pieceUrl pieceID = baseUrl ++ "/api/puzzles/gallaxy/"
-                 ++ pieceID ++ "/image.jpg"
-
-submitSolution : Model -> Cmd Msg
-submitSolution model =
-    let
-        json = model.piece.frames
-             |> List.filter
-                (\frame ->
-                     let {x1, y1, x2, y2} = frame
-                     in (x1 /= x2) && (y1 /= y2)
-                )
-             |> List.map
-                (\frame ->
-                     let {x1, y1, x2, y2} = frame
-                     in Encode.object
-                         [ ("x1", Encode.int x1)
-                         , ("y1", Encode.int y1)
-                         , ("x2", Encode.int x2)
-                         , ("y2", Encode.int y2)
-                         ]
-                )
-             |> Encode.list
-        url = baseUrl ++ "/api/link/gallaxy/"
-              ++ model.pieceID
-        request = HttpBuilder.post url
-                  |> HttpBuilder.withJsonBody json
-                  |> HttpBuilder.withExpectString
-    in HttpBuilder.send SubmissionStatus request
-
-getReadme : String -> Cmd Msg
-getReadme pieceID =
-    let
-        url = baseUrl ++ "/api/puzzles/gallaxy/"
-              ++ pieceID ++ "/readme.md"
-    in Http.send GetReadmeStatus
-        <| Http.getString url
 
 -- view
 buttons : Model -> Html Msg
@@ -203,6 +160,11 @@ visitorView model =
         []
         model.readme |> fromUnstyled
     ]
+
+pieceList : Model -> Html Msg
+pieceList model =
+    div
+    [][]
 
 creatorView : Model -> Html Msg
 creatorView model =

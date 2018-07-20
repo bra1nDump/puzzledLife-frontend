@@ -1,5 +1,6 @@
 port module Piece exposing
     ( Piece
+    , Frame
     , Msg
     , model
     , update
@@ -74,15 +75,21 @@ update msg piece =
             , Cmd.none
             )
         UpMsg (x, y) ->
-            let newFrames =
+            let frames =
                     case piece.frames of
                         { x1, y1 } :: tail ->
                            Frame x1 y1 (x |> floor) (y |> floor)
                                :: tail
                         _ ->
                             piece.frames
+                nonZeroFrames =
+                    frames |> List.filter
+                              (\frame ->
+                                   let {x1, y1, x2, y2} = frame
+                                   in (x1 /= x2) && (y1 /= y2)
+                              )
             in
-                ({ piece | frames = newFrames
+                ({ piece | frames = nonZeroFrames
                  , isSelectingFrame = False
                  }
                 , Cmd.none
